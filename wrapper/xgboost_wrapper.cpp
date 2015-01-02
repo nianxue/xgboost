@@ -132,6 +132,7 @@ extern "C"{
                                bst_ulong nrow,
                                bst_ulong ncol,
                                float  missing) {
+    bool nan_missing = std::isnan(missing);
     DMatrixSimple *p_mat = new DMatrixSimple();
     DMatrixSimple &mat = *p_mat;
     mat.info.info.num_row = nrow;
@@ -139,9 +140,13 @@ extern "C"{
     for (bst_ulong i = 0; i < nrow; ++i, data += ncol) {
       bst_ulong nelem = 0;
       for (bst_ulong j = 0; j < ncol; ++j) {
-        if (data[j] != missing) {
-          mat.row_data_.push_back(RowBatch::Entry(j, data[j]));
-          ++nelem;
+        if (std::isnan(data[j])) {
+          utils::Check(nan_missing, "There are NAN in the matrix, however, you did not set missing=NAN");          
+        } else {
+          if (nan_missing || data[j] != missing) {
+            mat.row_data_.push_back(RowBatch::Entry(j, data[j]));
+            ++nelem;
+          }
         }
       }
       mat.row_ptr_.push_back(mat.row_ptr_.back() + nelem);
@@ -288,11 +293,11 @@ extern "C"{
   void XGBoosterSaveModel(const void *handle, const char *fname) {
     static_cast<const Booster*>(handle)->SaveModel(fname);
   }
-  const char** XGBoosterDumpModel(void *handle, const char *fmap, bst_ulong *len){
+  const char** XGBoosterDumpModel(void *handle, const char *fmap, int with_stats, bst_ulong *len){
     utils::FeatMap featmap;
     if (strlen(fmap) != 0) {
       featmap.LoadText(fmap);
     }
-    return static_cast<Booster*>(handle)->GetModelDump(featmap, false, len);
+    return static_cast<Booster*>(handle)->GetModelDump(featmap, with_stats != 0, len);
   }
 }
